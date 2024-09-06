@@ -36,6 +36,4 @@ link_libraries(
 
 
 add_subdirectory(00-vkDev)
-#add_executable( ${PROJECT_NAME} 
-#    src/main.cpp 
-#)
+add_subdirectory(01-vkDev)
