@@ -88,6 +88,7 @@ private:
 		createInstance();
 		setupDebugMessenger();
 		pickPhysicalDevice();
+		createLogicalDevice();
 	}
 
 	void mainLoop()
@@ -243,8 +244,6 @@ private:
 	void pickPhysicalDevice()
 	{
 		// choice the physical GPU device
-		VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
-
 		uint32_t deviceCount = 0;
 		vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
 		if (deviceCount == 0)
@@ -325,8 +324,59 @@ private:
 		return indices;
 	}
 
+
+	void createLogicalDevice()
+	{
+		QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
+
+		// specify the queues to create
+		VkDeviceQueueCreateInfo queueCreateInfo{};
+		queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+		queueCreateInfo.queueFamilyIndex = indices.graphicsFamily.value();
+		queueCreateInfo.queueCount = 1;
+
+		float queuePriority = 1.0f;  // -> in range [0, 1.0]
+		queueCreateInfo.pQueuePriorities = &queuePriority;
+
+		// specify used device features
+		VkPhysicalDeviceFeatures deviceFeatures{};
+
+		// create logical device
+		VkDeviceCreateInfo createInfo{};
+		createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+
+		createInfo.pQueueCreateInfos = &queueCreateInfo;
+		createInfo.queueCreateInfoCount = 1;
+
+		createInfo.pEnabledFeatures = &deviceFeatures;
+
+		createInfo.enabledExtensionCount = 0;
+		if (enbleValidationLayers)
+		{
+			createInfo.enabledLayerCount = static_cast<uint32_t> (validationLayers.size());
+			createInfo.ppEnabledLayerNames = validationLayers.data();
+		}
+		else
+		{
+			createInfo.enabledLayerCount = 0;
+		}
+
+		// create logical device
+		if (vkCreateDevice(physicalDevice, &createInfo, nullptr, &device) != VK_SUCCESS)
+		{
+			throw std::runtime_error("failed to create logical device!");
+		}
+
+		// retrieving queue handles
+		vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue);
+	}
+
+
+
 	void cleanup()
 	{
+		vkDestroyDevice(device, nullptr);
+
 		if (enbleValidationLayers)
 		{
 			DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
@@ -342,6 +392,11 @@ private:
 	GLFWwindow* window;
 	VkInstance instance;
 	VkDebugUtilsMessengerEXT debugMessenger;
+
+	VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+	VkDevice device;
+
+	VkQueue graphicsQueue;
 };
 
 
