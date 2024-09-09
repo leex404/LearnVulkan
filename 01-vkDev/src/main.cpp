@@ -120,6 +120,9 @@ private:
 		glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
 		window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan - Draw a triangle", nullptr, nullptr);
+
+		glfwSetWindowUserPointer(window, this);
+		glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
 	}
 
 	void initVulkan()
@@ -986,11 +989,22 @@ private:
 	{
 		// wait for previous frame
 		vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
-		vkResetFences(device, 1, &inFlightFences[currentFrame]); // reset states
 
 		// acquire an image from swap chain
 		uint32_t imageIndex;
-		vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
+		VkResult result = vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
+		if (result == VK_ERROR_OUT_OF_DATE_KHR)
+		{
+			recreateSwaoChain();
+			return;
+		}
+		else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
+		{
+			throw std::runtime_error("failed to acquire swap chain image!");
+		}
+
+		// only reset the fence if we are submitting work
+		vkResetFences(device, 1, &inFlightFences[currentFrame]); // reset states
 
 		// record command buffer
 		vkResetCommandBuffer(commandBuffers[currentFrame], 0);
@@ -1031,7 +1045,16 @@ private:
 
 		presentInfo.pResults = nullptr; // Optional
 
-		vkQueuePresentKHR(presentQueue, &presentInfo);
+		result = vkQueuePresentKHR(presentQueue, &presentInfo);
+		if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || framebufferResized)
+		{
+			framebufferResized = false;
+			recreateSwaoChain();
+		}
+		else if (result != VK_SUCCESS)
+		{
+			throw std::runtime_error("failed to present swap chain image!");
+		}
 
 		// advance to next frame
 		currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
@@ -1063,9 +1086,45 @@ private:
 		}
 	}
 
+	void cleanupSwapChain()
+	{
+		for (size_t i = 0; i < swapChainFramebuffers.size(); i++) {
+			vkDestroyFramebuffer(device, swapChainFramebuffers[i], nullptr);
+		}
+
+		for (size_t i = 0; i < swapChainImageViews.size(); i++) {
+			vkDestroyImageView(device, swapChainImageViews[i], nullptr);
+		}
+
+		vkDestroySwapchainKHR(device, swapChain, nullptr);
+	}
+
+	void recreateSwaoChain()
+	{
+		// handle minimization
+		int width = 0, height = 0;
+		glfwGetFramebufferSize(window, &width, &height);
+		while (width == 0 || height == 0)
+		{
+			glfwGetFramebufferSize(window, &width, &height);
+			glfwWaitEvents(); // pause until window not minimization
+		}
+
+		// ensure all resources not in use
+		vkDeviceWaitIdle(device);
+
+		cleanupSwapChain();
+
+		creataSwapChain();
+		createImageViews();
+		createFramebuffers();
+	}
 
 	void cleanup()
 	{
+
+		cleanupSwapChain();
+
 		for (size_t idx = 0; idx < MAX_FRAMES_IN_FLIGHT; idx++)
 		{
 			vkDestroySemaphore(device, imageAvailableSemaphores[idx], nullptr);
@@ -1074,19 +1133,11 @@ private:
 		}
 
 		vkDestroyCommandPool(device, commandPool, nullptr);
-		for (auto framebuffer : swapChainFramebuffers)
-		{
-			vkDestroyFramebuffer(device, framebuffer, nullptr);
-		}
 
 		vkDestroyPipeline(device, graphicsPipeline, nullptr);
 		vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
 		vkDestroyRenderPass(device, renderPass, nullptr);
-		for (const auto& imageView : swapChainImageViews)
-		{
-			vkDestroyImageView(device, imageView, nullptr);
-		}
-		vkDestroySwapchainKHR(device, swapChain, nullptr);
+
 		vkDestroyDevice(device, nullptr);
 
 		if (enbleValidationLayers)
@@ -1100,6 +1151,12 @@ private:
 		glfwDestroyWindow(window);
 
 		glfwTerminate();
+	}
+
+
+	static void framebufferResizeCallback(GLFWwindow* window, int width, int height) {
+		auto app = reinterpret_cast<HelloTriangle*>(glfwGetWindowUserPointer(window));
+		app->framebufferResized = true;
 	}
 
 private:
@@ -1137,6 +1194,8 @@ private:
 	std::vector<VkSemaphore> imageAvailableSemaphores;
 	std::vector<VkSemaphore> renderFinishedSemaphores;
 	std::vector<VkFence> inFlightFences;
+
+	bool framebufferResized = false;
 
 	/* cuurent frame index */
 	uint32_t currentFrame = 0;
