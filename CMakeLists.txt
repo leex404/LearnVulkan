@@ -41,3 +41,4 @@ link_libraries(
 add_subdirectory(00-vkDev)
 add_subdirectory(01-vkDev)
 add_subdirectory(02-vkDev)
+add_subdirectory(03-vkDev)
