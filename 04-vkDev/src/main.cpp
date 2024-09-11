@@ -1196,9 +1196,6 @@ private:
 		barrier.subresourceRange.baseArrayLayer = 0;
 		barrier.subresourceRange.layerCount = 1;
 
-		barrier.srcAccessMask = 0; // TODO
-		barrier.dstAccessMask = 0; // TODO
-
 		VkPipelineStageFlags sourceStage;
 		VkPipelineStageFlags destinationStage;
 
@@ -1225,7 +1222,7 @@ private:
 
 		vkCmdPipelineBarrier(
 			commandBuffer,
-			0 /* TODO */, 0 /* TODO */,
+			sourceStage, destinationStage,
 			0,
 			0, nullptr,
 			0, nullptr,
@@ -1716,6 +1713,7 @@ private:
 		cleanupSwapChain();
 
 		vkDestroySampler(device, textureSampler, nullptr);
+		vkDestroyImageView(device, textureImageView, nullptr);
 		vkDestroyImage(device, textureImage, nullptr);
 		vkFreeMemory(device, textureImageMemory, nullptr);
 
