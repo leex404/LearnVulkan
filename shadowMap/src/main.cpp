@@ -64,12 +64,14 @@ const bool enbleValidationLayers = true;
 
 struct UniformBufferObject
 {
-	glm::mat4 model;
 	glm::mat4 view;
 	glm::mat4 proj;
 };
 
-
+struct PushConstantData
+{
+	glm::mat4 modelMatrix;
+};
 
 
 struct Vertex
@@ -148,6 +150,8 @@ struct RenderObject
 	// descriptor
 	VkDescriptorPool descriptorPool;
 	std::vector<VkDescriptorSet> descriptorSets;
+
+	glm::mat4 modelMatrix = glm::mat4(1.0f);
 };
 
 
@@ -1670,7 +1674,7 @@ private:
 			createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, 
 				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffers[idx], uniformBuffersMemory[idx]);
 
-			vkMapMemory(device, uniformBuffersMemory[idx], 0, bufferSize, 0, &uniformBuffersMapped[idx]);
+			//vkMapMemory(device, uniformBuffersMemory[idx], 0, bufferSize, 0, &uniformBuffersMapped[idx]);
 		}
 	}
 
@@ -1766,12 +1770,19 @@ private:
 
 	VkPipelineLayout createPipelineLayout(const VkDescriptorSetLayout& dSetLayouts)
 	{
+		// push constant data, model matrix
+		VkPushConstantRange pcRange = {
+			.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+			.offset     = 0,
+			.size       = sizeof(PushConstantData)
+		};
+
 		VkPipelineLayoutCreateInfo pipelineLayoutInfo{ 
 			.sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 			.setLayoutCount         = 1,
 			.pSetLayouts            = &dSetLayouts,
-			.pushConstantRangeCount = 0, // Optional
-			.pPushConstantRanges    = nullptr, // Optional
+			.pushConstantRangeCount = 1, 
+			.pPushConstantRanges    = &pcRange, 
 		};
 
 		VkPipelineLayout layout;
@@ -1837,12 +1848,18 @@ private:
 		std::vector<std::string> stageTexImgs{ "../../resources/texture/stage.png" };
 		// create resouce of vertex, index, texture, descriptor 
 		createObjectResource(stage, stageModelPath, stageTexImgs);
+		stage.modelMatrix = glm::rotate(stage.modelMatrix, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+		stage.modelMatrix = glm::translate(stage.modelMatrix, glm::vec3(0.0f, 0.0f, 1.9f));;
+		stage.modelMatrix = glm::scale(stage.modelMatrix, glm::vec3(1.8f));
 		baseScenePass.renderObjects.push_back(stage);
 
 		RenderObject marry;
 		std::string marryModelPath = "../../resources/models/Marry.obj";
 		std::vector<std::string> marryTexImgs{ "../../resources/texture/MC003_Kozakura_Mari.png" };
 		createObjectResource(marry, marryModelPath, marryTexImgs);
+
+		marry.modelMatrix = glm::translate(marry.modelMatrix, glm::vec3(0.0f, -1.8f, 0.0f));
+
 		baseScenePass.renderObjects.push_back(marry);
 	}
 	
@@ -1916,6 +1933,13 @@ private:
 		for (size_t idx = 0; idx < baseScenePass.renderObjects.size(); idx++)
 		{
 			const auto& renderObject = baseScenePass.renderObjects[idx];
+
+			//updateUniformBuffer(currentFrame, renderObject.modelMatrix, idx);
+			PushConstantData pcData = { renderObject.modelMatrix };
+
+			//pcData.modelMatrix = glm::rotate(pcData.modelMatrix, float(glfwGetTime()) * glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+			vkCmdPushConstants(commandBuffer, baseScenePass.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstantData), &pcData);
+
 			// binding pipeline
 			vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, baseScenePass.pipeline);
 
@@ -1951,14 +1975,12 @@ private:
 
 		// MVP 
 		UniformBufferObject ubo{};
-		ubo.model = glm::mat4(1.0f); 
-		ubo.model = glm::rotate(ubo.model, time * glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-		ubo.model = glm::scale(ubo.model, glm::vec3(0.75f));
-		ubo.model = glm::translate(ubo.model, glm::vec3(0.0f, -2.0f, 0.0f));
+
+		//ubo.model = modelMatrix;
+		//ubo.model = glm::rotate(ubo.model, time * glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
 
-
-		ubo.view =  glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+		ubo.view =  glm::lookAt(glm::vec3(0.0f, 0.0f, 7.5f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 		ubo.proj =  glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 15.0f);
 
 		// flip the sign on the scaling factor of the Y axis in the projection matrix
@@ -1966,7 +1988,10 @@ private:
 
 		// how change single model's mvp matrix ???
 		// update memory
-		memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
+		void* data;
+		vkMapMemory(device, uniformBuffersMemory[currentImage], 0, sizeof(ubo), 0, &data);
+		memcpy(data, &ubo, sizeof(ubo));
+		vkUnmapMemory(device, uniformBuffersMemory[currentImage]);
 	}
 	
 	void drawFrame()
@@ -2124,23 +2149,34 @@ private:
 	{
 		cleanupSwapChain();
 
-		//vkDestroySampler(device, textureSampler, nullptr);
-		//vkDestroyImageView(device, textureImageView, nullptr);
-		//vkDestroyImage(device, textureImage, nullptr);
-		//vkFreeMemory(device, textureImageMemory, nullptr);
+		// destroy base scene resource
+		vkDestroyPipeline(device, baseScenePass.pipeline, nullptr);
+		vkDestroyPipelineLayout(device, baseScenePass.pipelineLayout, nullptr);
+		vkDestroyDescriptorSetLayout(device, baseScenePass.descriptorSetLayout, nullptr);
+		for (size_t i = 0; i < baseScenePass.renderObjects.size(); i++)
+		{
+			auto& object = baseScenePass.renderObjects[i];
+			vkDestroyDescriptorPool(device, object.descriptorPool, nullptr);
+
+			for (size_t j = 0; j < object.textureImages.size(); j++)
+			{
+				vkDestroyImageView(device, object.textureImageViews[j], nullptr);
+				vkDestroySampler(device, object.textureSamplers[j], nullptr);
+				vkDestroyImage(device, object.textureImages[j], nullptr);
+				vkFreeMemory(device, object.textureImageMemorys[j], nullptr);
+			}
+
+			vkDestroyBuffer(device, object.vertexBuffer, nullptr);
+			vkFreeMemory(device, object.vertexBufferMemory, nullptr);
+
+			vkDestroyBuffer(device, object.indexBuffer, nullptr);
+			vkFreeMemory(device, object.indexBufferMemory, nullptr);
+		}
 
 		for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
 			vkDestroyBuffer(device, uniformBuffers[i], nullptr);
 			vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
 		}
-
-		//vkDestroyDescriptorPool(device, descriptorPool, nullptr);
-		//vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
-		//vkDestroyBuffer(device, vertexBuffer, nullptr);
-		//vkFreeMemory(device, vertexBufferMemory, nullptr);
-
-		//vkDestroyBuffer(device, indexBuffer, nullptr);
-		//vkFreeMemory(device, indexBufferMemory, nullptr);
 
 		for (size_t idx = 0; idx < MAX_FRAMES_IN_FLIGHT; idx++)
 		{
@@ -2151,8 +2187,6 @@ private:
 
 		vkDestroyCommandPool(device, commandPool, nullptr);
 
-		//vkDestroyPipeline(device, graphicsPipeline, nullptr);
-		//vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
 		vkDestroyRenderPass(device, renderPass, nullptr);
 
 		vkDestroyDevice(device, nullptr);
