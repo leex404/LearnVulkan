@@ -9,21 +9,33 @@ layout(location = 0) out vec3 fragPos;
 layout(location = 1) out vec3 fragColor;
 layout(location = 2) out vec3 fragNormal;
 layout(location = 3) out vec2 fragTexCoord;
+layout(location = 4) out vec4 fragPosFromLight;
 
 layout (binding  = 0) uniform UniformBufferObject {
 	mat4 view;
 	mat4 proj;
+	mat4 lightVP;
 } ubo;
 
 layout(push_constant) uniform PushConstants {
     mat4 model;
-};
+} pc;
+
+
+const mat4 biasMat = mat4( 
+	0.5, 0.0, 0.0, 0.0,
+	0.0, 0.5, 0.0, 0.0,
+	0.0, 0.0, 1.0, 0.0,
+	0.5, 0.5, 0.0, 1.0 );
 
 void main() {
-    gl_Position = ubo.proj * ubo.view * model * vec4(inPosition, 1.0);
+    gl_Position = ubo.proj * ubo.view * pc.model * vec4(inPosition, 1.0);
 	
-	fragNormal = mat3(model) * normalize(inNormal);
-	fragPos = vec3(model * vec4(inPosition, 1.0));
+	fragNormal = mat3(pc.model) * normalize(inNormal);
+	fragPos = vec3(pc.model * vec4(inPosition, 1.0));
     fragColor = inColor;
 	fragTexCoord = inTexCoord;
+	// fragPosFromLight = pc.lightMVP * vec4(inPosition, 1.0);
+	fragPosFromLight = (biasMat * ubo.lightVP * pc.model) * vec4(inPosition, 1.0);
+
 }

@@ -64,16 +64,30 @@ const std::vector<const char*> deviceExtensions = {
 
 const bool enbleValidationLayers = true;
 
-struct UniformBufferObject
+struct ShadowUBO
 {
 	glm::mat4 view;
 	glm::mat4 proj;
 };
 
+struct UniformBufferObject
+{
+	glm::mat4 view;
+	glm::mat4 proj;
+	glm::mat4 lightVP;
+};
+
+
+struct ViewUniformBufferObject
+{
+	glm::vec4 cameraPos;
+	glm::vec4 lightPos;
+};
+
 struct PushConstantData
 {
 	glm::mat4 modelMatrix;
-};
+} gPcdata;
 
 
 struct Vertex
@@ -129,6 +143,13 @@ struct Vertex
 	}
 };
 
+struct Input
+{
+	glm::vec3 lightPos = { 0.0f, 0.0f, 8.5f };
+	glm::vec3 cameraPos = { 0.0f, 0.0f, 8.5f };
+	//glm::vec3 cameraPos = { 0.0f, 0.0f, -8.0f };
+
+}gInput;
 
 struct RenderObject
 {
@@ -908,6 +929,25 @@ private:
 			};
 			bindings.push_back(samplerLayoutBinding);
 		}
+
+		// shadowMap texture
+		VkDescriptorSetLayoutBinding shadowMapBinding{
+				.binding            = 2,
+				.descriptorType     = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+				.descriptorCount    = 1,
+				.stageFlags         = VK_SHADER_STAGE_FRAGMENT_BIT,
+				.pImmutableSamplers = nullptr,
+		};
+		bindings.push_back(shadowMapBinding);
+
+		VkDescriptorSetLayoutBinding viewUboLayoutBinding{
+			.binding            = 3,
+			.descriptorType     = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			.descriptorCount    = 1,
+			.stageFlags         = VK_SHADER_STAGE_FRAGMENT_BIT, // ubo in vertex shader
+			.pImmutableSamplers = nullptr, // Optional
+		};
+		bindings.push_back(viewUboLayoutBinding);
 
 		VkDescriptorSetLayoutCreateInfo layoutInfo {
 			.sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
@@ -1695,16 +1735,32 @@ private:
 
 			vkMapMemory(device, uniformBuffersMemory[idx], 0, bufferSize, 0, &uniformBuffersMapped[idx]);
 		}
+
+		bufferSize = sizeof(ViewUniformBufferObject);
+		viewUniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+		viewUniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
+		viewUniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
+
+		for (size_t idx = 0; idx < MAX_FRAMES_IN_FLIGHT; idx++)
+		{
+			createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, viewUniformBuffers[idx], viewUniformBuffersMemory[idx]);
+
+			vkMapMemory(device, viewUniformBuffersMemory[idx], 0, bufferSize, 0, &viewUniformBuffersMapped[idx]);
+		}
 	}
 
 	void createDescriptorPool(VkDescriptorPool& pool, uint32_t samplerNum)
 	{
 		// each frame need one descriptor
-		size_t uSize = 1; // ubo size
+		size_t uSize = 2; // ubo size
 		std::vector<VkDescriptorPoolSize> poolSizes;
 		poolSizes.resize(samplerNum + uSize); // sampler num + ubo num
 		poolSizes[0].type            = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 		poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+
+		poolSizes[1].type            = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		poolSizes[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
 
 		for (size_t idx = 0; idx < samplerNum; idx++)
 		{
@@ -1744,7 +1800,7 @@ private:
 
 		for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
 			std::vector<VkWriteDescriptorSet> descriptorWrites;
-			descriptorWrites.resize(1 + imageViews.size());
+			descriptorWrites.resize(3 + imageViews.size());
 			
 			// ubo
 			VkDescriptorBufferInfo bufferInfo {
@@ -1783,6 +1839,35 @@ private:
 				descriptorWrites[imgIdx + 1].pImageInfo      = &imageInfos[imgIdx];
 			}
 
+			// shadowMap sampler
+			VkDescriptorImageInfo shadowImageInfo{
+				.sampler = shadowPass.shadowMapSampler,
+				.imageView = shadowPass.shadowMapImageView,
+				.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+			};
+
+			descriptorWrites[2].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			descriptorWrites[2].dstSet          = descriptorSets[i];
+			descriptorWrites[2].dstBinding      = 2 ;
+			descriptorWrites[2].dstArrayElement = 0;
+			descriptorWrites[2].descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			descriptorWrites[2].descriptorCount = 1;
+			descriptorWrites[2].pImageInfo      = &shadowImageInfo;
+
+			// view ubo
+			VkDescriptorBufferInfo viewBufferInfo{
+				.buffer = viewUniformBuffers[i],
+				.offset = 0,
+				.range = sizeof(ViewUniformBufferObject),
+			};
+			descriptorWrites[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			descriptorWrites[3].dstSet = descriptorSets[i];
+			descriptorWrites[3].dstBinding = 3;
+			descriptorWrites[3].dstArrayElement = 0;
+			descriptorWrites[3].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			descriptorWrites[3].descriptorCount = 1;
+			descriptorWrites[3].pBufferInfo = &viewBufferInfo;
+
 			vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
 		}
 	}
@@ -1813,7 +1898,6 @@ private:
 
 	void createShadowMapPass()
 	{
-
 		// shadow depth texture
 		shadowPass.width = swapChainExtent.width;
 		shadowPass.height = swapChainExtent.height;
@@ -1836,7 +1920,7 @@ private:
 		);
 
 		// ubo
-		VkDeviceSize uboSize = sizeof(UniformBufferObject);
+		VkDeviceSize uboSize = sizeof(ShadowUBO);
 		shadowPass.uniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
 		shadowPass.uniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
 		for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
@@ -1868,7 +1952,27 @@ private:
 		}
 
 		// descriptor pool
-		createDescriptorPool(shadowPass.descriptorPool, 0);
+		//createDescriptorPool(shadowPass.descriptorPool, 0);
+
+		// each frame need one descriptor
+		size_t uSize = 1; // ubo size
+		std::vector<VkDescriptorPoolSize> poolSizes;
+		poolSizes.resize(uSize); // sampler num + ubo num
+		poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+
+
+		VkDescriptorPoolCreateInfo poolInfo{
+			.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+			.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT),
+
+			.poolSizeCount = static_cast<uint32_t>(poolSizes.size()),
+			.pPoolSizes = poolSizes.data(),
+		};
+
+		if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &shadowPass.descriptorPool) != VK_SUCCESS) {
+			throw std::runtime_error("failed to create descriptor pool!");
+		}
 
 
 		// descriptor sets create
@@ -1894,7 +1998,7 @@ private:
 			VkDescriptorBufferInfo bufferInfo{
 				.buffer = uniformBuffers[i],
 				.offset = 0,
-				.range = sizeof(UniformBufferObject),
+				.range = sizeof(ShadowUBO),
 			};
 			descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 			descriptorWrites[0].dstSet = shadowPass.descriptoSets[i];
@@ -1913,11 +2017,11 @@ private:
 			.format         = depthFormat,
 			.samples        = VK_SAMPLE_COUNT_1_BIT,
 			.loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR,
-			.storeOp        = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+			.storeOp        = VK_ATTACHMENT_STORE_OP_STORE,
 			.stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 			.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
 			.initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED,
-			.finalLayout    = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+			.finalLayout    = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
 		};
 
 		VkAttachmentReference depthAttachmentRef{
@@ -2212,6 +2316,8 @@ private:
 			};
 
 
+
+
 			// buffer
 			createVertexBuffer(model.vertices, model.vertexBuffer, model.vertexBufferMemory);
 			createIndexBuffer(model.indices, model.indexBuffer, model.indexBufferMemory);
@@ -2228,7 +2334,7 @@ private:
 		createObjectResource(stage, stageModelPath, stageTexImgs);
 		stage.modelMatrix = glm::rotate(stage.modelMatrix, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
 		stage.modelMatrix = glm::translate(stage.modelMatrix, glm::vec3(0.0f, 0.0f, 1.9f));;
-		stage.modelMatrix = glm::scale(stage.modelMatrix, glm::vec3(1.8f));
+		stage.modelMatrix = glm::scale(stage.modelMatrix, glm::vec3(2.2f));
 		baseScenePass.renderObjects.push_back(stage);
 
 		RenderObject marry;
@@ -2348,7 +2454,7 @@ private:
 		{
 			// clear value for different attachment
 			std::array<VkClearValue, 2> clearColors{};
-			clearColors[0].color = { {0.25f, 0.25f, 0.25f, 1.0f} };
+			clearColors[0].color = { {0.2f, 0.2f, 0.2f, 1.0f} };
 			clearColors[1].depthStencil = { 1.0f, 0 };
 
 			// start render scene pass
@@ -2431,27 +2537,40 @@ private:
 		auto currentTime = std::chrono::high_resolution_clock::now();
 		float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
-		// MVP 
+		// shadow
+		ShadowUBO shadowUbo{};
+		shadowUbo.view = glm::lookAt(gInput.lightPos, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+		shadowUbo.proj = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, 0.1f, 15.0f);
+		//shadowUbo.proj = glm::perspective(glm::radians(45.0f), 1.0f, 0.1f, 15.0f);
+		shadowUbo.proj[1][1] *= -1;
+
+		// shaow
+		void* data;
+		vkMapMemory(device, shadowPass.uniformBuffersMemory[currentImage], 0, sizeof(shadowUbo), 0, &data);
+		memcpy(data, &shadowUbo, sizeof(shadowUbo));
+		vkUnmapMemory(device, shadowPass.uniformBuffersMemory[currentImage]);
+
+
+		// VP 
 		UniformBufferObject ubo{};
 
-		//ubo.model = modelMatrix;
-		//ubo.model = glm::rotate(ubo.model, time * glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-
-
-		ubo.view =  glm::lookAt(glm::vec3(0.0f, 0.0f, 7.5f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-		ubo.proj =  glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 15.0f);
-
+		ubo.view = glm::lookAt(gInput.cameraPos, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+		ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 15.0f);
 		// flip the sign on the scaling factor of the Y axis in the projection matrix
 		ubo.proj[1][1] *= -1;
+
+		ubo.lightVP = shadowUbo.proj * shadowUbo.view;
 
 		// update memory
 		memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
 
-		// shaow
-		void* data;
-		vkMapMemory(device, shadowPass.uniformBuffersMemory[currentImage], 0, sizeof(ubo), 0, &data);
-		memcpy(data, &ubo, sizeof(ubo));
-		vkUnmapMemory(device, shadowPass.uniformBuffersMemory[currentImage]);
+		ViewUniformBufferObject vubo{};
+		vubo.cameraPos = glm::vec4(gInput.cameraPos, 1.0);
+		vubo.lightPos = glm::vec4(gInput.lightPos, 0.0f);
+
+		// update memory
+		memcpy(viewUniformBuffersMapped[currentImage], &vubo, sizeof(vubo));
+
 	}
 	
 	void drawFrame()
@@ -2652,6 +2771,9 @@ private:
 		for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
 			vkDestroyBuffer(device, uniformBuffers[i], nullptr);
 			vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
+
+			vkDestroyBuffer(device, viewUniformBuffers[i], nullptr);
+			vkFreeMemory(device, viewUniformBuffersMemory[i], nullptr);
 		}
 
 		for (size_t idx = 0; idx < MAX_FRAMES_IN_FLIGHT; idx++)
@@ -2736,6 +2858,10 @@ private:
 	std::vector<VkBuffer> uniformBuffers;
 	std::vector<VkDeviceMemory> uniformBuffersMemory;
 	std::vector<void*> uniformBuffersMapped;
+
+	std::vector<VkBuffer> viewUniformBuffers;
+	std::vector<VkDeviceMemory> viewUniformBuffersMemory;
+	std::vector<void*> viewUniformBuffersMapped;
 
 	VkImage depthImage;
 	VkDeviceMemory depthImageMemory;
