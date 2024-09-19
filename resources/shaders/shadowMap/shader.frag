@@ -90,7 +90,7 @@ void main() {
 
 	float shadow = hardShadow(shadowCoord, 0);
 
-    outColor = vec4(blinnPhong(0), 1.0);
+    outColor = vec4(blinnPhong(shadow), 1.0);
 	// float closestDepth = texture(shadowMap, shadowCoord.xy).r;
     // outColor = vec4( closestDepth, closestDepth, closestDepth, 1.0);
 }

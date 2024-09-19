@@ -36,6 +36,8 @@
 const int WIDTH = 1280;
 const int HEIGHT = 800;
 
+const uint32_t SHADOW_SIZE = 1024;
+
 const int MAX_FRAMES_IN_FLIGHT = 2;
 
 const std::string title = "Vulkan - ShadowMap Demo";
@@ -87,7 +89,7 @@ struct ViewUniformBufferObject
 struct PushConstantData
 {
 	glm::mat4 modelMatrix;
-} gPcdata;
+} ;
 
 
 struct Vertex
@@ -145,9 +147,14 @@ struct Vertex
 
 struct Input
 {
-	glm::vec3 lightPos = { 0.0f, 0.0f, 8.5f };
+	glm::vec3 lightPos = { -4.0f, 4.0f, 4.0f };
 	glm::vec3 cameraPos = { 0.0f, 0.0f, 8.5f };
 	//glm::vec3 cameraPos = { 0.0f, 0.0f, -8.0f };
+
+	float zNear = 0.1f;
+	float zFar = 25.0f;
+
+	float lightFOV = 45.0f;
 
 }gInput;
 
@@ -1899,8 +1906,8 @@ private:
 	void createShadowMapPass()
 	{
 		// shadow depth texture
-		shadowPass.width = swapChainExtent.width;
-		shadowPass.height = swapChainExtent.height;
+		shadowPass.width = SHADOW_SIZE;
+		shadowPass.height = SHADOW_SIZE;
 
 		VkFormat depthFormat = findDepthFormat();
 
@@ -2186,7 +2193,7 @@ private:
 			.depthClampEnable        = VK_FALSE,
 			.rasterizerDiscardEnable = VK_FALSE, // fragment to framebuffer
 			.polygonMode             = VK_POLYGON_MODE_FILL,
-			.cullMode                = VK_CULL_MODE_BACK_BIT,
+			.cullMode                = VK_CULL_MODE_NONE,
 			.frontFace               = VK_FRONT_FACE_COUNTER_CLOCKWISE,
 			.depthBiasEnable         = VK_FALSE,
 			.depthBiasConstantFactor = 0.0f, // Optional
@@ -2231,7 +2238,7 @@ private:
 			.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
 			.depthTestEnable = VK_TRUE,
 			.depthWriteEnable = VK_TRUE,
-			.depthCompareOp = VK_COMPARE_OP_LESS,
+			.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL,
 			.depthBoundsTestEnable = VK_FALSE,
 			.stencilTestEnable = VK_FALSE,
 			.front = {},
@@ -2424,8 +2431,8 @@ private:
 
 				//updateUniformBuffer(currentFrame, renderObject.modelMatrix, idx);
 				PushConstantData pcData = { renderObject.modelMatrix };
-				if (idx == 1)
-					pcData.modelMatrix = glm::rotate(pcData.modelMatrix, float(glfwGetTime()) * glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+				//if (idx == 1)
+				//	pcData.modelMatrix = glm::rotate(pcData.modelMatrix, float(glfwGetTime()) * glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 				vkCmdPushConstants(commandBuffer, shadowPass.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstantData), &pcData);
 
 				// binding pipeline
@@ -2499,8 +2506,8 @@ private:
 
 				//updateUniformBuffer(currentFrame, renderObject.modelMatrix, idx);
 				PushConstantData pcData = { renderObject.modelMatrix };
-				if (idx == 1)
-					pcData.modelMatrix = glm::rotate(pcData.modelMatrix, float(glfwGetTime()) * glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+				//if (idx == 1)
+				//	pcData.modelMatrix = glm::rotate(pcData.modelMatrix, float(glfwGetTime()) * glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 				vkCmdPushConstants(commandBuffer, baseScenePass.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstantData), &pcData);
 
 				// binding pipeline
@@ -2540,7 +2547,7 @@ private:
 		// shadow
 		ShadowUBO shadowUbo{};
 		shadowUbo.view = glm::lookAt(gInput.lightPos, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-		shadowUbo.proj = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, 0.1f, 15.0f);
+		shadowUbo.proj = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, gInput.zNear, gInput.zFar);
 		//shadowUbo.proj = glm::perspective(glm::radians(45.0f), 1.0f, 0.1f, 15.0f);
 		shadowUbo.proj[1][1] *= -1;
 
@@ -2555,7 +2562,7 @@ private:
 		UniformBufferObject ubo{};
 
 		ubo.view = glm::lookAt(gInput.cameraPos, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-		ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 15.0f);
+		ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float)swapChainExtent.height, gInput.zNear, gInput.zFar);
 		// flip the sign on the scaling factor of the Y axis in the projection matrix
 		ubo.proj[1][1] *= -1;
 
