@@ -63,5 +63,5 @@ vec3 phong(float shadow)
 }
 
 void main() {
-    outColor = vec4(phong(0.0f), 1.0);
+    outColor = vec4(blinnPhong(0.0f), 1.0);
 }
