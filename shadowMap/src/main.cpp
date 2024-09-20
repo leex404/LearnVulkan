@@ -147,12 +147,11 @@ struct Vertex
 
 struct Input
 {
-	glm::vec3 lightPos = { -4.0f, 4.0f, 4.0f };
+	glm::vec3 lightPos = { 12.0f, 12.0f, 12.0f };
 	glm::vec3 cameraPos = { 0.0f, 0.0f, 8.5f };
-	//glm::vec3 cameraPos = { 0.0f, 0.0f, -8.0f };
 
 	float zNear = 0.1f;
-	float zFar = 25.0f;
+	float zFar = 256.0;
 
 	float lightFOV = 45.0f;
 
@@ -219,6 +218,7 @@ struct ShadowMapPass
 
 	std::vector<VkBuffer> uniformBuffers;
 	std::vector<VkDeviceMemory> uniformBuffersMemory;
+	std::vector<void*> uniformBuffersMapped;
 };
 
 
@@ -1306,18 +1306,20 @@ private:
 	}
 
 	VkCommandBuffer beginSingleTimeCommands() {
-		VkCommandBufferAllocateInfo allocInfo{};
-		allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-		allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-		allocInfo.commandPool = commandPool;
-		allocInfo.commandBufferCount = 1;
+		VkCommandBufferAllocateInfo allocInfo {
+			.sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+			.commandPool        = commandPool,
+			.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+			.commandBufferCount = 1,
+		};
 
 		VkCommandBuffer commandBuffer;
 		vkAllocateCommandBuffers(device, &allocInfo, &commandBuffer);
 
-		VkCommandBufferBeginInfo beginInfo{};
-		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-		beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+		VkCommandBufferBeginInfo beginInfo {
+			.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+			.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+		};
 
 		vkBeginCommandBuffer(commandBuffer, &beginInfo);
 
@@ -1327,10 +1329,11 @@ private:
 	void endSingleTimeCommands(VkCommandBuffer commandBuffer) {
 		vkEndCommandBuffer(commandBuffer);
 
-		VkSubmitInfo submitInfo{};
-		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		submitInfo.commandBufferCount = 1;
-		submitInfo.pCommandBuffers = &commandBuffer;
+		VkSubmitInfo submitInfo {
+			.sType              = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+			.commandBufferCount = 1,
+			.pCommandBuffers    = &commandBuffer,
+		};
 
 		vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
 		vkQueueWaitIdle(graphicsQueue);
@@ -1731,29 +1734,29 @@ private:
 	{
 		VkDeviceSize bufferSize = sizeof(UniformBufferObject);
 
-		uniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
-		uniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
-		uniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
+		m_uniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+		m_uniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
+		m_uniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
 
 		for (size_t idx = 0; idx < MAX_FRAMES_IN_FLIGHT; idx++)
 		{
 			createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, 
-				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffers[idx], uniformBuffersMemory[idx]);
+				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, m_uniformBuffers[idx], m_uniformBuffersMemory[idx]);
 
-			vkMapMemory(device, uniformBuffersMemory[idx], 0, bufferSize, 0, &uniformBuffersMapped[idx]);
+			vkMapMemory(device, m_uniformBuffersMemory[idx], 0, bufferSize, 0, &m_uniformBuffersMapped[idx]);
 		}
 
 		bufferSize = sizeof(ViewUniformBufferObject);
-		viewUniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
-		viewUniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
-		viewUniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
+		m_viewUniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+		m_viewUniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
+		m_viewUniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
 
 		for (size_t idx = 0; idx < MAX_FRAMES_IN_FLIGHT; idx++)
 		{
 			createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, viewUniformBuffers[idx], viewUniformBuffersMemory[idx]);
+				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, m_viewUniformBuffers[idx], m_viewUniformBuffersMemory[idx]);
 
-			vkMapMemory(device, viewUniformBuffersMemory[idx], 0, bufferSize, 0, &viewUniformBuffersMapped[idx]);
+			vkMapMemory(device, m_viewUniformBuffersMemory[idx], 0, bufferSize, 0, &m_viewUniformBuffersMapped[idx]);
 		}
 	}
 
@@ -1811,7 +1814,7 @@ private:
 			
 			// ubo
 			VkDescriptorBufferInfo bufferInfo {
-				.buffer = uniformBuffers[i],
+				.buffer = m_uniformBuffers[i],
 				.offset = 0,
 				.range  = sizeof(UniformBufferObject),
 			};
@@ -1863,7 +1866,7 @@ private:
 
 			// view ubo
 			VkDescriptorBufferInfo viewBufferInfo{
-				.buffer = viewUniformBuffers[i],
+				.buffer = m_viewUniformBuffers[i],
 				.offset = 0,
 				.range = sizeof(ViewUniformBufferObject),
 			};
@@ -1930,11 +1933,15 @@ private:
 		VkDeviceSize uboSize = sizeof(ShadowUBO);
 		shadowPass.uniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
 		shadowPass.uniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
+		shadowPass.uniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
+
 		for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
 		{
 			createBuffer(uboSize,
 				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 				shadowPass.uniformBuffers[i], shadowPass.uniformBuffersMemory[i]);
+
+			vkMapMemory(device, shadowPass.uniformBuffersMemory[i], 0, uboSize, 0, &shadowPass.uniformBuffersMapped[i]);
 		}
 		
 		// descriptor layout
@@ -1970,11 +1977,11 @@ private:
 
 
 		VkDescriptorPoolCreateInfo poolInfo{
-			.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-			.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT),
+			.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+			.maxSets       = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT),
 
 			.poolSizeCount = static_cast<uint32_t>(poolSizes.size()),
-			.pPoolSizes = poolSizes.data(),
+			.pPoolSizes    = poolSizes.data(),
 		};
 
 		if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &shadowPass.descriptorPool) != VK_SUCCESS) {
@@ -1985,10 +1992,10 @@ private:
 		// descriptor sets create
 		std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, shadowPass.descriptoSetLayout);
 		VkDescriptorSetAllocateInfo allocInfo{
-			.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-			.descriptorPool = shadowPass.descriptorPool,
+			.sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+			.descriptorPool     = shadowPass.descriptorPool,
 			.descriptorSetCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT),
-			.pSetLayouts = layouts.data(),
+			.pSetLayouts        = layouts.data(),
 		};
 
 		shadowPass.descriptoSets.resize(MAX_FRAMES_IN_FLIGHT);
@@ -2003,17 +2010,17 @@ private:
 
 			// ubo
 			VkDescriptorBufferInfo bufferInfo{
-				.buffer = uniformBuffers[i],
+				.buffer = shadowPass.uniformBuffers[i],
 				.offset = 0,
 				.range = sizeof(ShadowUBO),
 			};
-			descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			descriptorWrites[0].dstSet = shadowPass.descriptoSets[i];
-			descriptorWrites[0].dstBinding = 0;
+			descriptorWrites[0].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			descriptorWrites[0].dstSet          = shadowPass.descriptoSets[i];
+			descriptorWrites[0].dstBinding      = 0;
 			descriptorWrites[0].dstArrayElement = 0;
-			descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			descriptorWrites[0].descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 			descriptorWrites[0].descriptorCount = 1;
-			descriptorWrites[0].pBufferInfo = &bufferInfo;
+			descriptorWrites[0].pBufferInfo     = &bufferInfo;
 
 			vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
 		}
@@ -2322,9 +2329,6 @@ private:
 				);
 			};
 
-
-
-
 			// buffer
 			createVertexBuffer(model.vertices, model.vertexBuffer, model.vertexBufferMemory);
 			createIndexBuffer(model.indices, model.indexBuffer, model.indexBufferMemory);
@@ -2379,7 +2383,7 @@ private:
 		if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
 			throw std::runtime_error("failed to begin recording command buffer!");
 		}
-
+		float time = glfwGetTime();
 		// shadow pass
 		{
 			std::array<VkClearValue, 1> clearColors{};
@@ -2407,7 +2411,7 @@ private:
 			// scene viewport
 			VkViewport viewport{
 				.x = 0.0f,
-				.y = 0.0f,
+				.y = 0.0f, //-1.0f *shadowPass.height,
 				.width = static_cast<float>(shadowPass.width),
 				.height = static_cast<float>(shadowPass.height),
 				.minDepth = 0.0f,
@@ -2431,8 +2435,8 @@ private:
 
 				//updateUniformBuffer(currentFrame, renderObject.modelMatrix, idx);
 				PushConstantData pcData = { renderObject.modelMatrix };
-				//if (idx == 1)
-				//	pcData.modelMatrix = glm::rotate(pcData.modelMatrix, float(glfwGetTime()) * glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+				if (idx == 1)
+					pcData.modelMatrix = glm::rotate(pcData.modelMatrix, time * glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 				vkCmdPushConstants(commandBuffer, shadowPass.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstantData), &pcData);
 
 				// binding pipeline
@@ -2485,7 +2489,7 @@ private:
 			// scene viewport
 			VkViewport viewport{
 				.x = 0.0f,
-				.y = 0.0f,
+				.y = 0.0f , //-1.0f * static_cast<float>(swapChainExtent.height),
 				.width = static_cast<float>(swapChainExtent.width),
 				.height = static_cast<float>(swapChainExtent.height),
 				.minDepth = 0.0f,
@@ -2506,8 +2510,8 @@ private:
 
 				//updateUniformBuffer(currentFrame, renderObject.modelMatrix, idx);
 				PushConstantData pcData = { renderObject.modelMatrix };
-				//if (idx == 1)
-				//	pcData.modelMatrix = glm::rotate(pcData.modelMatrix, float(glfwGetTime()) * glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+				if (idx == 1)
+					pcData.modelMatrix = glm::rotate(pcData.modelMatrix, time * glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 				vkCmdPushConstants(commandBuffer, baseScenePass.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstantData), &pcData);
 
 				// binding pipeline
@@ -2537,6 +2541,14 @@ private:
 		}
 	}
 
+	void updateLight()
+	{
+		// Animate the light source
+		gInput.lightPos.x = -1 * cos(glm::radians(glfwGetTime() * 360.0f)) * 40.0f;
+		gInput.lightPos.y = 50.0f + sin(glm::radians(glfwGetTime() * 360.0f)) * 20.0f;
+		gInput.lightPos.z = 25.0f + sin(glm::radians(glfwGetTime() * 360.0f)) * 5.0f;
+	}
+
 	void updateUniformBuffer(uint32_t currentImage)
 	{
 		static auto startTime = std::chrono::high_resolution_clock::now();
@@ -2544,39 +2556,37 @@ private:
 		auto currentTime = std::chrono::high_resolution_clock::now();
 		float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
+		//updateLight();
+
 		// shadow
 		ShadowUBO shadowUbo{};
 		shadowUbo.view = glm::lookAt(gInput.lightPos, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-		shadowUbo.proj = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, gInput.zNear, gInput.zFar);
-		//shadowUbo.proj = glm::perspective(glm::radians(45.0f), 1.0f, 0.1f, 15.0f);
+		shadowUbo.proj = glm::ortho(10.0f, -10.0f, 10.0f, -10.0f, gInput.zNear, gInput.zFar);
+		//shadowUbo.proj = glm::perspective(glm::radians(gInput.lightFOV), 1.0f, gInput.zNear, gInput.zFar);
 		shadowUbo.proj[1][1] *= -1;
 
-		// shaow
-		void* data;
-		vkMapMemory(device, shadowPass.uniformBuffersMemory[currentImage], 0, sizeof(shadowUbo), 0, &data);
-		memcpy(data, &shadowUbo, sizeof(shadowUbo));
-		vkUnmapMemory(device, shadowPass.uniformBuffersMemory[currentImage]);
+		memcpy(shadowPass.uniformBuffersMapped[currentImage], &shadowUbo, sizeof(shadowUbo));
 
 
 		// VP 
 		UniformBufferObject ubo{};
 
 		ubo.view = glm::lookAt(gInput.cameraPos, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-		ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float)swapChainExtent.height, gInput.zNear, gInput.zFar);
+		ubo.proj = glm::perspective(glm::radians(gInput.lightFOV), swapChainExtent.width / (float)swapChainExtent.height, gInput.zNear, gInput.zFar);
 		// flip the sign on the scaling factor of the Y axis in the projection matrix
 		ubo.proj[1][1] *= -1;
 
 		ubo.lightVP = shadowUbo.proj * shadowUbo.view;
 
 		// update memory
-		memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
+		memcpy(m_uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
 
 		ViewUniformBufferObject vubo{};
 		vubo.cameraPos = glm::vec4(gInput.cameraPos, 1.0);
 		vubo.lightPos = glm::vec4(gInput.lightPos, 0.0f);
 
 		// update memory
-		memcpy(viewUniformBuffersMapped[currentImage], &vubo, sizeof(vubo));
+		memcpy(m_viewUniformBuffersMapped[currentImage], &vubo, sizeof(vubo));
 
 	}
 	
@@ -2605,7 +2615,7 @@ private:
 		vkResetFences(device, 1, &inFlightFences[currentFrame]); // reset states
 
 
-		// record command buffer
+		// record command buffer, make sure previous command buffer finished execute
 		vkResetCommandBuffer(commandBuffers[currentFrame], 0);
 		recordCommandBuffer(commandBuffers[currentFrame], imageIndex);
 
@@ -2776,11 +2786,11 @@ private:
 		}
 
 		for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-			vkDestroyBuffer(device, uniformBuffers[i], nullptr);
-			vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
+			vkDestroyBuffer(device, m_uniformBuffers[i], nullptr);
+			vkFreeMemory(device, m_uniformBuffersMemory[i], nullptr);
 
-			vkDestroyBuffer(device, viewUniformBuffers[i], nullptr);
-			vkFreeMemory(device, viewUniformBuffersMemory[i], nullptr);
+			vkDestroyBuffer(device, m_viewUniformBuffers[i], nullptr);
+			vkFreeMemory(device, m_viewUniformBuffersMemory[i], nullptr);
 		}
 
 		for (size_t idx = 0; idx < MAX_FRAMES_IN_FLIGHT; idx++)
@@ -2862,13 +2872,13 @@ private:
 	BaseScenePass baseScenePass;
 
 
-	std::vector<VkBuffer> uniformBuffers;
-	std::vector<VkDeviceMemory> uniformBuffersMemory;
-	std::vector<void*> uniformBuffersMapped;
+	std::vector<VkBuffer> m_uniformBuffers;
+	std::vector<VkDeviceMemory> m_uniformBuffersMemory;
+	std::vector<void*> m_uniformBuffersMapped;
 
-	std::vector<VkBuffer> viewUniformBuffers;
-	std::vector<VkDeviceMemory> viewUniformBuffersMemory;
-	std::vector<void*> viewUniformBuffersMapped;
+	std::vector<VkBuffer> m_viewUniformBuffers;
+	std::vector<VkDeviceMemory> m_viewUniformBuffersMemory;
+	std::vector<void*> m_viewUniformBuffersMapped;
 
 	VkImage depthImage;
 	VkDeviceMemory depthImageMemory;

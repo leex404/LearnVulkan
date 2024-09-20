@@ -32,10 +32,13 @@ void main() {
     gl_Position = ubo.proj * ubo.view * pc.model * vec4(inPosition, 1.0);
 	
 	fragNormal = mat3(pc.model) * normalize(inNormal);
+
 	fragPos = vec3(pc.model * vec4(inPosition, 1.0));
-    fragColor = inColor;
+    
+	fragColor = inColor;
 	fragTexCoord = inTexCoord;
-	// fragPosFromLight = pc.lightMVP * vec4(inPosition, 1.0);
-	fragPosFromLight = (biasMat * ubo.lightVP * pc.model) * vec4(inPosition, 1.0);
+
+
+	fragPosFromLight = (  ubo.lightVP ) * vec4(inPosition, 1.0);
 
 }

@@ -86,11 +86,11 @@ void main() {
 	
 	// to NDC
 	vec3 shadowCoord = fragPosFromLight.xyz / fragPosFromLight.w;
-	// shadowCoord = shadowCoord * 0.5 + 0.5;
+	shadowCoord = shadowCoord * 0.5 + 0.5;
 
-	float shadow = hardShadow(shadowCoord, 0);
+	float shadow = hardShadow(shadowCoord, 0.005);
 
     outColor = vec4(blinnPhong(shadow), 1.0);
 	// float closestDepth = texture(shadowMap, shadowCoord.xy).r;
-    // outColor = vec4( closestDepth, closestDepth, closestDepth, 1.0);
+    // outColor = vec4( 1.0 - (1.0 - closestDepth) * 100.0);
 }
