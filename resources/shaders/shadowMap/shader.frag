@@ -20,6 +20,11 @@ layout (binding  = 3) uniform UniformBufferObject {
 
 vec3 uLightColor = {1.0f, 1.0f, 1.0f};
 
+float zNear = 0.1f;
+float zFar = 15.0f;
+float lightWidth = 1.0f;
+
+
 
 // base light color
 vec3 blinnPhong(float shadow)
@@ -82,13 +87,89 @@ float hardShadow(vec3 coord, float bias)
 	return shadow;
 }
 
+// Percentage Closer Filtering (PCF)
+float PCF(vec3 coord, float bias, float radius )
+{
+	float closestDepth = texture(shadowMap, coord.xy).r; 
+    float currentDepth = coord.z;
+
+	int count = 0;
+	int step = 2;
+	float shadow = 0.0;
+    vec2  texelSize = 1.0 / vec2(textureSize(shadowMap, 0));
+    for(int x = -step; x <= step; ++x) {
+        for(int y = -step; y <= step; ++y) {
+            float pcfDepth = texture(shadowMap, coord.xy + radius * vec2(x, y) * texelSize).r; 
+            shadow += currentDepth - bias > pcfDepth  ? 1.0 : 0.0;   
+			count++;
+        }    
+    }
+    shadow /= float(count);
+    
+    // keep the shadow at 0.0 when outside the far_plane region of the light's frustum.
+    if(coord.z > 1.0 ) {
+       shadow = 0.0;
+    }
+
+	return shadow;
+}
+
+
+// Percentage Closer Soft Shadows (PCSS) 
+float findBlocker(vec2 uv, float zReceiver) 
+{
+    int blockerNum = 0;
+    float blockDepth = 0.0;
+    float radius = lightWidth * (zReceiver - zNear / zFar) / zReceiver;;
+
+    int step = 1;
+    vec2  texelSize = 1.0 / vec2(textureSize(shadowMap, 0));
+    for(int x = -step; x <= step; ++x) {
+        for(int y = -step; y <= step; ++y) {
+            float shadowMapDepth = texture(shadowMap, uv + radius*vec2(x, y) * texelSize).r;
+            if(zReceiver > shadowMapDepth) 
+            {
+                blockDepth += shadowMapDepth;
+                ++blockerNum;
+            }
+        }
+    }
+
+    if(blockerNum == 0) {
+        return 1.0;
+    }
+  
+    return blockDepth / float(blockerNum);
+}
+
+float PCSS(vec3 coord, float bias){
+  float zReceiver = coord.z;
+
+  // STEP 1: blocker search to get avgblocker depth
+  float avgBlockerDepth = findBlocker(coord.xy, zReceiver);
+
+  // STEP 2: penumbra estimation
+  float penumbra = (zReceiver - avgBlockerDepth) * lightWidth / avgBlockerDepth;
+  float filterRadiusUV = penumbra;
+
+  // STEP 3: PCF filtering
+  return PCF(coord, bias, filterRadiusUV);
+}
+
 void main() {
 	
 	// to NDC
 	vec3 shadowCoord = fragPosFromLight.xyz / fragPosFromLight.w;
-	shadowCoord = shadowCoord * 0.5 + 0.5;
+	
+    float bias = 0.0f;
+    vec3 lightDir = normalize(uLightPos.xyz - fragPos);
+    bias = max(0.035 * (1.0 - dot(fragNormal, lightDir)), 0.005);
 
-	float shadow = hardShadow(shadowCoord, 0.005);
+	//shadowCoord.y = 1.0 - shadowCoord.y;
+
+	//float shadow = hardShadow(shadowCoord, bias);
+	// float shadow = PCF(shadowCoord, bias, 0.0);
+    float shadow = PCSS(shadowCoord, bias);
 
     outColor = vec4(blinnPhong(shadow), 1.0);
 	// float closestDepth = texture(shadowMap, shadowCoord.xy).r;

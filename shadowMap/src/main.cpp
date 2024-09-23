@@ -34,9 +34,9 @@
 #include <unordered_map>
 
 const int WIDTH = 1280;
-const int HEIGHT = 800;
+const int HEIGHT = 1280;
 
-const uint32_t SHADOW_SIZE = 1024;
+const uint32_t SHADOW_SIZE = 2048;
 
 const int MAX_FRAMES_IN_FLIGHT = 2;
 
@@ -147,11 +147,14 @@ struct Vertex
 
 struct Input
 {
-	glm::vec3 lightPos = { 12.0f, 12.0f, 12.0f };
-	glm::vec3 cameraPos = { 0.0f, 0.0f, 8.5f };
+	glm::vec3 lightPos = { -5.0f, 5.0f, 3.0f };
+	//glm::vec3 lightPos = { 1.0f, 1.0f, 9.0f };
+	glm::vec3 cameraPos = { 0.0f, 2.0f, 10.0f };
+	glm::vec3 cameraUp = { 0.0f, 1.0f, 0.0f };
+	glm::vec3 target = { 0.0f, 0.0f, 0.0f };
 
 	float zNear = 0.1f;
-	float zFar = 256.0;
+	float zFar = 15.0;
 
 	float lightFOV = 45.0f;
 
@@ -1654,6 +1657,10 @@ private:
 
 				vertex.color = { 1.0f, 1.0f, 1.0f };
 
+				// Flip Y-Axis of vertex positions
+				//vertex.pos.y *= -1.0f;
+				//vertex.normal.y *= -1.0f;
+
 				if (uniqueVertices.count(vertex) == 0)
 				{
 					uniqueVertices[vertex] = static_cast<uint32_t>(model.vertices.size());
@@ -2343,9 +2350,9 @@ private:
 		std::vector<std::string> stageTexImgs{ "../../resources/texture/stage.png" };
 		// create resouce of vertex, index, texture, descriptor 
 		createObjectResource(stage, stageModelPath, stageTexImgs);
-		stage.modelMatrix = glm::rotate(stage.modelMatrix, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-		stage.modelMatrix = glm::translate(stage.modelMatrix, glm::vec3(0.0f, 0.0f, 1.9f));;
-		stage.modelMatrix = glm::scale(stage.modelMatrix, glm::vec3(2.2f));
+		stage.modelMatrix = glm::rotate(stage.modelMatrix, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+		stage.modelMatrix = glm::translate(stage.modelMatrix, glm::vec3(0.0f, 0.0f, -1.3f));
+		stage.modelMatrix = glm::scale(stage.modelMatrix, glm::vec3(2.4f, 2.2f, 2.4f ));
 		baseScenePass.renderObjects.push_back(stage);
 
 		RenderObject marry;
@@ -2353,7 +2360,8 @@ private:
 		std::vector<std::string> marryTexImgs{ "../../resources/texture/MC003_Kozakura_Mari.png" };
 		createObjectResource(marry, marryModelPath, marryTexImgs);
 
-		marry.modelMatrix = glm::translate(marry.modelMatrix, glm::vec3(0.0f, -1.8f, 0.0f));
+		marry.modelMatrix = glm::translate(marry.modelMatrix, glm::vec3(0.0f, -1.2f, 0.0f));
+		marry.modelMatrix = glm::scale(marry.modelMatrix, glm::vec3(0.8f, 0.8f, 0.8f));
 
 		baseScenePass.renderObjects.push_back(marry);
 	}
@@ -2411,7 +2419,7 @@ private:
 			// scene viewport
 			VkViewport viewport{
 				.x = 0.0f,
-				.y = 0.0f, //-1.0f *shadowPass.height,
+				.y = 0.0f,
 				.width = static_cast<float>(shadowPass.width),
 				.height = static_cast<float>(shadowPass.height),
 				.minDepth = 0.0f,
@@ -2489,7 +2497,7 @@ private:
 			// scene viewport
 			VkViewport viewport{
 				.x = 0.0f,
-				.y = 0.0f , //-1.0f * static_cast<float>(swapChainExtent.height),
+				.y = 0.0f,
 				.width = static_cast<float>(swapChainExtent.width),
 				.height = static_cast<float>(swapChainExtent.height),
 				.minDepth = 0.0f,
@@ -2544,9 +2552,10 @@ private:
 	void updateLight()
 	{
 		// Animate the light source
-		gInput.lightPos.x = -1 * cos(glm::radians(glfwGetTime() * 360.0f)) * 40.0f;
-		gInput.lightPos.y = 50.0f + sin(glm::radians(glfwGetTime() * 360.0f)) * 20.0f;
-		gInput.lightPos.z = 25.0f + sin(glm::radians(glfwGetTime() * 360.0f)) * 5.0f;
+		float rad = 5;
+		gInput.lightPos.x = -6.0f * cos(glm::radians(glfwGetTime() * 30.0f)) ;
+		//gInput.lightPos.y = 50.0f + sin(glm::radians(glfwGetTime() * 360.0f)) * 20.0f;
+		gInput.lightPos.z = 5.0f * sin(glm::radians(glfwGetTime() * 30.0f));
 	}
 
 	void updateUniformBuffer(uint32_t currentImage)
@@ -2556,12 +2565,12 @@ private:
 		auto currentTime = std::chrono::high_resolution_clock::now();
 		float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
-		//updateLight();
+		updateLight();
 
 		// shadow
 		ShadowUBO shadowUbo{};
-		shadowUbo.view = glm::lookAt(gInput.lightPos, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-		shadowUbo.proj = glm::ortho(10.0f, -10.0f, 10.0f, -10.0f, gInput.zNear, gInput.zFar);
+		shadowUbo.view = glm::lookAt(gInput.lightPos, gInput.target, gInput.cameraUp);
+		shadowUbo.proj = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, gInput.zNear, gInput.zFar);
 		//shadowUbo.proj = glm::perspective(glm::radians(gInput.lightFOV), 1.0f, gInput.zNear, gInput.zFar);
 		shadowUbo.proj[1][1] *= -1;
 
@@ -2571,7 +2580,7 @@ private:
 		// VP 
 		UniformBufferObject ubo{};
 
-		ubo.view = glm::lookAt(gInput.cameraPos, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+		ubo.view = glm::lookAt(gInput.cameraPos, gInput.target, gInput.cameraUp);
 		ubo.proj = glm::perspective(glm::radians(gInput.lightFOV), swapChainExtent.width / (float)swapChainExtent.height, gInput.zNear, gInput.zFar);
 		// flip the sign on the scaling factor of the Y axis in the projection matrix
 		ubo.proj[1][1] *= -1;

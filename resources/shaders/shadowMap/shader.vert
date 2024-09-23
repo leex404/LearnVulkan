@@ -39,6 +39,6 @@ void main() {
 	fragTexCoord = inTexCoord;
 
 
-	fragPosFromLight = (  ubo.lightVP ) * vec4(inPosition, 1.0);
+	fragPosFromLight = (biasMat *  ubo.lightVP * pc.model ) * vec4(inPosition, 1.0);
 
 }
