@@ -31,7 +31,7 @@ const mat4 biasMat = mat4(
 void main() {
     gl_Position = ubo.proj * ubo.view * pc.model * vec4(inPosition, 1.0);
 	
-	fragNormal = mat3(pc.model) * normalize(inNormal);
+	fragNormal = transpose(inverse(mat3(pc.model))) * normalize(inNormal);
 
 	fragPos = vec3(pc.model * vec4(inPosition, 1.0));
     

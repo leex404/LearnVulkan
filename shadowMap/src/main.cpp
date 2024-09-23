@@ -34,9 +34,11 @@
 #include <unordered_map>
 
 const int WIDTH = 1280;
-const int HEIGHT = 1280;
+const int HEIGHT = 800;
 
-const uint32_t SHADOW_SIZE = 2048;
+float deltaTime = 0.0f;
+
+const uint32_t SHADOW_SIZE = 1024;
 
 const int MAX_FRAMES_IN_FLIGHT = 2;
 
@@ -84,6 +86,7 @@ struct ViewUniformBufferObject
 {
 	glm::vec4 cameraPos;
 	glm::vec4 lightPos;
+	glm::ivec3 funcMask;
 };
 
 struct PushConstantData
@@ -157,6 +160,17 @@ struct Input
 	float zFar = 15.0;
 
 	float lightFOV = 45.0f;
+
+	bool isModelRoll = false;
+	glm::mat4 modelRoll = glm::mat4(1.0f);
+
+	bool isLightRoll = false;
+
+	bool isCameraRoll = false;
+
+	
+	// bias shadow light
+	glm::ivec3 funcMask = glm::ivec3(1, 2, 2);
 
 }gInput;
 
@@ -301,7 +315,7 @@ struct SwapChainSupportDetails
 	std::vector<VkPresentModeKHR> presentModes;
 };
 
-class HelloTriangle
+class ShadowMapApp
 {
 public:
 	void run()
@@ -323,6 +337,11 @@ private:
 
 		glfwSetWindowUserPointer(window, this);
 		glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
+
+		glfwSetCursorPosCallback(window, ShadowMapApp::onMouse);
+		glfwSetScrollCallback(window, ShadowMapApp::onScroll);
+		glfwSetKeyCallback(window, ShadowMapApp::onKeyBoard);
+
 	}
 
 	void initVulkan()
@@ -349,11 +368,126 @@ private:
 		createSyncObjects();
 	}
 
+	static void onMouse(GLFWwindow* window, double xpos, double ypos)
+	{
+		//App* app = static_cast<App*>(glfwGetWindowUserPointer(window));
+		//app->mouse(xpos, ypos);
+	}
+
+	static void onScroll(GLFWwindow* window, double xoffset, double yoffset)
+	{
+		//App* app = static_cast<App*>(glfwGetWindowUserPointer(window));
+		//app->scroll(xoffset, yoffset);
+	}
+	void scroll(double xoffset, double yoffset)
+	{
+		//camera.ProcessMouseScroll(static_cast<float>(yoffset));
+	}
+
+	static void onKeyBoard(GLFWwindow* window, int key, int scancode, int action, int mods)
+	{
+		ShadowMapApp* app = static_cast<ShadowMapApp*>(glfwGetWindowUserPointer(window));
+		//app->keyBoard(key, scancode, action, mods);
+
+		if (action == GLFW_PRESS && key == GLFW_KEY_ESCAPE)
+			glfwSetWindowShouldClose(window, true);
+
+		// light roll
+		if (action == GLFW_PRESS && key == GLFW_KEY_L)
+		{
+			gInput.isLightRoll = !gInput.isLightRoll;
+		}
+
+		// model roll
+		if (action == GLFW_PRESS && key == GLFW_KEY_M)
+		{
+			gInput.isModelRoll = !gInput.isModelRoll;
+		}
+
+		// camera roll
+		if (action == GLFW_PRESS && key == GLFW_KEY_C)
+		{
+			gInput.isCameraRoll = !gInput.isCameraRoll;
+		}
+
+		// reset scene
+		if (action == GLFW_PRESS && key == GLFW_KEY_R)
+		{
+			gInput = Input();
+		}
+
+		// bias mask
+		if (action == GLFW_PRESS && key == GLFW_KEY_0)
+		{
+			gInput.funcMask[0] = 0;
+		}
+		if (action == GLFW_PRESS && key == GLFW_KEY_1)
+		{
+			gInput.funcMask[0] = 1;
+		}
+
+		// shadow
+		if (action == GLFW_PRESS && key == GLFW_KEY_2)
+		{
+			gInput.funcMask[1] = 0; // no shadow
+		}
+		if (action == GLFW_PRESS && key == GLFW_KEY_3)
+		{
+			gInput.funcMask[1] = 1; // hadrd shadow
+		}
+		if (action == GLFW_PRESS && key == GLFW_KEY_4)
+		{
+			gInput.funcMask[1] = 2; // PCF
+		}
+		if (action == GLFW_PRESS && key == GLFW_KEY_5)
+		{
+			gInput.funcMask[1] = 3; // PCSS
+		}
+
+		// light
+		if (action == GLFW_PRESS && key == GLFW_KEY_6)
+		{
+			gInput.funcMask[2] = 0; // base color
+		}
+		if (action == GLFW_PRESS && key == GLFW_KEY_7)
+		{
+			gInput.funcMask[2] = 1; // phong
+		}
+		if (action == GLFW_PRESS && key == GLFW_KEY_8)
+		{
+			gInput.funcMask[2] = 2; // blinnPhong
+		}
+		if (action == GLFW_PRESS && key == GLFW_KEY_9)
+		{
+			gInput.funcMask[2] = 3; // shadowMap
+		}
+	}
+
+	void processInput()
+	{
+		// WASD
+		//if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+		//	camera.ProcessKeyboard(FORWARD, deltaTime);
+		//if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+		//	camera.ProcessKeyboard(BACKWARD, deltaTime);
+		//if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+		//	camera.ProcessKeyboard(LEFT, deltaTime);
+		//if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+		//	camera.ProcessKeyboard(RIGHT, deltaTime);
+	}
+
 	void mainLoop()
 	{
+		float lastFrame = 0.0f;
 		while (!glfwWindowShouldClose(window))
 		{
+			float currentFrame = static_cast<float>(glfwGetTime());
+			deltaTime = currentFrame - lastFrame;
+			lastFrame = currentFrame;
+
 			glfwPollEvents();
+
+			processInput();
 
 			drawFrame();
 		}
@@ -2443,8 +2577,8 @@ private:
 
 				//updateUniformBuffer(currentFrame, renderObject.modelMatrix, idx);
 				PushConstantData pcData = { renderObject.modelMatrix };
-				if (idx == 1)
-					pcData.modelMatrix = glm::rotate(pcData.modelMatrix, time * glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+				if (gInput.isModelRoll && idx == 1)
+					pcData.modelMatrix = pcData.modelMatrix * gInput.modelRoll;
 				vkCmdPushConstants(commandBuffer, shadowPass.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstantData), &pcData);
 
 				// binding pipeline
@@ -2518,8 +2652,8 @@ private:
 
 				//updateUniformBuffer(currentFrame, renderObject.modelMatrix, idx);
 				PushConstantData pcData = { renderObject.modelMatrix };
-				if (idx == 1)
-					pcData.modelMatrix = glm::rotate(pcData.modelMatrix, time * glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+				if (gInput.isModelRoll && idx == 1)
+					pcData.modelMatrix = pcData.modelMatrix * gInput.modelRoll;
 				vkCmdPushConstants(commandBuffer, baseScenePass.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstantData), &pcData);
 
 				// binding pipeline
@@ -2551,11 +2685,18 @@ private:
 
 	void updateLight()
 	{
-		// Animate the light source
-		float rad = 5;
-		gInput.lightPos.x = -6.0f * cos(glm::radians((float)glfwGetTime() * 30.0f)) ;
-		//gInput.lightPos.y ;
-		gInput.lightPos.z = 5.0f * sin(glm::radians((float)glfwGetTime() * 30.0f));
+		glm::mat4 rt = glm::rotate(glm::mat4(1.0), glm::radians(25.0f) * (float)deltaTime, glm::vec3(0.0f, 1.0f, 0.0f));
+
+		auto newPos = rt * glm::vec4(gInput.lightPos, 1.0);
+		gInput.lightPos = glm::vec3(newPos);
+	}
+
+	void updateCamera()
+	{
+		glm::mat4 rt = glm::rotate(glm::mat4(1.0), glm::radians(25.0f) * (float)deltaTime, glm::vec3(0.0f, 1.0f, 0.0f));
+
+		auto newPos = rt * glm::vec4(gInput.cameraPos, 1.0);
+		gInput.cameraPos = glm::vec3(newPos);
 	}
 
 	void updateUniformBuffer(uint32_t currentImage)
@@ -2565,12 +2706,26 @@ private:
 		auto currentTime = std::chrono::high_resolution_clock::now();
 		float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
-		updateLight();
+		if (gInput.isLightRoll)
+		{
+			updateLight();
+		}
+
+		if (gInput.isCameraRoll)
+		{
+			updateCamera();
+		}
+
+		if (gInput.isModelRoll)
+		{
+			glm::mat4 rt = glm::rotate(glm::mat4(1.0), glm::radians(30.0f) * (float)deltaTime, glm::vec3(0.0f, 1.0f, 0.0f));
+			gInput.modelRoll *= rt;
+		}
 
 		// shadow
 		ShadowUBO shadowUbo{};
 		shadowUbo.view = glm::lookAt(gInput.lightPos, gInput.target, gInput.cameraUp);
-		shadowUbo.proj = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, gInput.zNear, gInput.zFar);
+		shadowUbo.proj = glm::ortho(-5.0f, 5.0f, -5.0f, 5.0f, gInput.zNear, gInput.zFar);
 		//shadowUbo.proj = glm::perspective(glm::radians(gInput.lightFOV), 1.0f, gInput.zNear, gInput.zFar);
 		shadowUbo.proj[1][1] *= -1;
 
@@ -2593,6 +2748,7 @@ private:
 		ViewUniformBufferObject vubo{};
 		vubo.cameraPos = glm::vec4(gInput.cameraPos, 1.0);
 		vubo.lightPos = glm::vec4(gInput.lightPos, 0.0f);
+		vubo.funcMask = gInput.funcMask;
 
 		// update memory
 		memcpy(m_viewUniformBuffersMapped[currentImage], &vubo, sizeof(vubo));
@@ -2830,7 +2986,7 @@ private:
 
 
 	static void framebufferResizeCallback(GLFWwindow* window, int width, int height) {
-		auto app = reinterpret_cast<HelloTriangle*>(glfwGetWindowUserPointer(window));
+		auto app = reinterpret_cast<ShadowMapApp*>(glfwGetWindowUserPointer(window));
 		app->framebufferResized = true;
 	}
 
@@ -2896,7 +3052,7 @@ private:
 
 
 int main() {
-    HelloTriangle app;
+	ShadowMapApp app;
 
 	try
 	{

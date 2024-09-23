@@ -16,7 +16,13 @@ layout(binding = 2) uniform sampler2D shadowMap;
 layout (binding  = 3) uniform UniformBufferObject {
 	vec4 uCameraPos;
     vec4 uLightPos;
+	ivec3 funcMask;
 };
+
+
+// bit mask
+// bias hardShadow PCF PCSS
+
 
 vec3 uLightColor = {1.0f, 1.0f, 1.0f};
 
@@ -162,19 +168,46 @@ void main() {
 	vec3 shadowCoord = fragPosFromLight.xyz / fragPosFromLight.w;
 	
     float bias = 0.0f;
-    vec3 lightDir = normalize(uLightPos.xyz - fragPos);
-    bias = max(0.035 * (1.0 - dot(fragNormal, lightDir)), 0.005);
-
-	//shadowCoord.y = 1.0 - shadowCoord.y;
-
-	//float shadow = hardShadow(shadowCoord, bias);
-	//float shadow = PCF(shadowCoord, bias, 0.0);
-    float shadow = PCSS(shadowCoord, bias);
-
-    vec3 color = blinnPhong(shadow);
-    // color = pow(color, vec3( 2.2f));
-
+	float shadow = 0.0f;
+	vec3 color = vec3(0.25f);
+	
+	
+	// bias
+	if (funcMask[0] == 1) {
+		vec3 lightDir = normalize(uLightPos.xyz - fragPos);
+        bias = max(0.003 * (1.0 - dot(fragNormal, lightDir)), 0.0005);
+	}
+	else{
+		bias = 0.0f;
+	}
+	
+	// shadow
+	if (funcMask[1] == 0) { // no shadow 
+		;;
+	}
+	else if (funcMask[1] == 1) { // hard shadow
+		shadow = hardShadow(shadowCoord, bias);
+	}
+	else if (funcMask[1] == 2) { // PCF 
+		shadow = PCF(shadowCoord, bias, 1.0);
+	}
+	else if (funcMask[1] == 3) { // PCSS
+		shadow = PCSS(shadowCoord, bias);
+	}
+	
+	// light
+	if (funcMask[2] == 0) { // base color
+		color = texture(texSampler, fragTexCoord).rgb;
+	}
+	else if (funcMask[2] == 1) { // phong 
+		color = phong(shadow);
+	}
+	else if (funcMask[2] == 2) { // blinnPhong 
+	    color = blinnPhong(shadow);
+	}
+	else if (funcMask[2] == 3){ // base color
+		color = vec3(texture(shadowMap, shadowCoord.xy).r);
+	}
+	
     outColor = vec4(color, 1.0);
-	// float closestDepth = texture(shadowMap, shadowCoord.xy).r;
-    // outColor = vec4( 1.0 - (1.0 - closestDepth) * 100.0);
 }
