@@ -3,7 +3,6 @@ set(EXAMPLES
 	shadowMap_demo
 )
 
-
 add_executable(${EXAMPLES} 
 	src/main.cpp
 )

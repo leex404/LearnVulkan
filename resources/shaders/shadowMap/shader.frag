@@ -168,10 +168,13 @@ void main() {
 	//shadowCoord.y = 1.0 - shadowCoord.y;
 
 	//float shadow = hardShadow(shadowCoord, bias);
-	// float shadow = PCF(shadowCoord, bias, 0.0);
+	//float shadow = PCF(shadowCoord, bias, 0.0);
     float shadow = PCSS(shadowCoord, bias);
 
-    outColor = vec4(blinnPhong(shadow), 1.0);
+    vec3 color = blinnPhong(shadow);
+    // color = pow(color, vec3( 2.2f));
+
+    outColor = vec4(color, 1.0);
 	// float closestDepth = texture(shadowMap, shadowCoord.xy).r;
     // outColor = vec4( 1.0 - (1.0 - closestDepth) * 100.0);
 }

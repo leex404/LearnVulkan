@@ -2391,7 +2391,7 @@ private:
 		if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
 			throw std::runtime_error("failed to begin recording command buffer!");
 		}
-		float time = glfwGetTime();
+		float time = (float)glfwGetTime();
 		// shadow pass
 		{
 			std::array<VkClearValue, 1> clearColors{};
@@ -2553,9 +2553,9 @@ private:
 	{
 		// Animate the light source
 		float rad = 5;
-		gInput.lightPos.x = -6.0f * cos(glm::radians(glfwGetTime() * 30.0f)) ;
-		//gInput.lightPos.y = 50.0f + sin(glm::radians(glfwGetTime() * 360.0f)) * 20.0f;
-		gInput.lightPos.z = 5.0f * sin(glm::radians(glfwGetTime() * 30.0f));
+		gInput.lightPos.x = -6.0f * cos(glm::radians((float)glfwGetTime() * 30.0f)) ;
+		//gInput.lightPos.y ;
+		gInput.lightPos.z = 5.0f * sin(glm::radians((float)glfwGetTime() * 30.0f));
 	}
 
 	void updateUniformBuffer(uint32_t currentImage)
