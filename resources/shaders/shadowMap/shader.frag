@@ -206,7 +206,9 @@ void main() {
 	    color = blinnPhong(shadow);
 	}
 	else if (funcMask[2] == 3){ // base color
-		color = vec3(texture(shadowMap, shadowCoord.xy).r);
+	    // float depth = texture(shadowMap, shadowCoord.xy).r;
+		// color = vec3(1.0f - depth);
+		color = fragNormal;
 	}
 	
     outColor = vec4(color, 1.0);

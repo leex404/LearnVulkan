@@ -48,9 +48,6 @@ const std::string fragShaderPath = "../../resources/shaders/shadowMap/frag.spv";
 const std::string shadowVertShaderPath = "../../resources/shaders/shadowMap/shadow_vert.spv";
 const std::string shadowFragShaderPath = "../../resources/shaders/shadowMap/shadow_frag.spv";
 
-const std::string roomModelPath = "../../resources/models/Marry.obj";
-const std::string roomTexturePath = "../../resources/texture/MC003_Kozakura_Mari.png";
-
 
 const std::vector<const char*> validationLayers = {
 	"VK_LAYER_KHRONOS_validation"
@@ -157,7 +154,7 @@ struct Input
 	glm::vec3 target = { 0.0f, 0.0f, 0.0f };
 
 	float zNear = 0.1f;
-	float zFar = 15.0;
+	float zFar = 20.0f;
 
 	float lightFOV = 45.0f;
 
@@ -171,6 +168,11 @@ struct Input
 	
 	// bias shadow light
 	glm::ivec3 funcMask = glm::ivec3(1, 2, 2);
+
+	bool setTitle = true;
+	std::string BiasInfo = "Yes";
+	std::string ShadowInfo = "PCF";
+	std::string LightInfo = "BlinnPhong";
 
 }gInput;
 
@@ -270,7 +272,17 @@ static std::vector<char> readFile(const std::string& filename)
 	return buffer;
 }
 
+std::string getTitleInfo()
+{
+	std::stringstream sinfo;
+	sinfo << std::left;
+	sinfo << "\tInfo: [Bias: " << std::setw(5) <<gInput.BiasInfo;
+	sinfo << " ShadowAlgo: " << std::setw(12) << gInput.ShadowInfo;
+	sinfo << " LightAlgo: " << std::setw(12) << gInput.LightInfo << ']';
 
+	std::string newTitle = title + sinfo.str();
+	return newTitle;
+}
 VkResult CreateDebugUtilsMessengerEXT(
 	VkInstance instance, 
 	const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, 
@@ -376,13 +388,10 @@ private:
 
 	static void onScroll(GLFWwindow* window, double xoffset, double yoffset)
 	{
-		//App* app = static_cast<App*>(glfwGetWindowUserPointer(window));
-		//app->scroll(xoffset, yoffset);
+		static float rotationSpeed = 1.0f;
+		gInput.cameraPos += glm::vec3(0.0f, -(float) yoffset * rotationSpeed, 0.0f);
 	}
-	void scroll(double xoffset, double yoffset)
-	{
-		//camera.ProcessMouseScroll(static_cast<float>(yoffset));
-	}
+
 
 	static void onKeyBoard(GLFWwindow* window, int key, int scancode, int action, int mods)
 	{
@@ -416,64 +425,118 @@ private:
 			gInput = Input();
 		}
 
+		
 		// bias mask
 		if (action == GLFW_PRESS && key == GLFW_KEY_0)
 		{
 			gInput.funcMask[0] = 0;
+			gInput.BiasInfo =  "No";
+			gInput.setTitle = true;
 		}
 		if (action == GLFW_PRESS && key == GLFW_KEY_1)
 		{
 			gInput.funcMask[0] = 1;
+			gInput.BiasInfo = "Yes";
+			gInput.setTitle = true;
 		}
 
 		// shadow
 		if (action == GLFW_PRESS && key == GLFW_KEY_2)
 		{
 			gInput.funcMask[1] = 0; // no shadow
+			gInput.ShadowInfo = "NoShadow";
+			gInput.setTitle = true;
 		}
 		if (action == GLFW_PRESS && key == GLFW_KEY_3)
 		{
-			gInput.funcMask[1] = 1; // hadrd shadow
+			gInput.funcMask[1] = 1; // hard shadow
+			gInput.ShadowInfo = "HardShadow";
+			gInput.setTitle = true;
 		}
 		if (action == GLFW_PRESS && key == GLFW_KEY_4)
 		{
 			gInput.funcMask[1] = 2; // PCF
+			gInput.ShadowInfo = "PCF";
+			gInput.setTitle = true;
 		}
 		if (action == GLFW_PRESS && key == GLFW_KEY_5)
 		{
 			gInput.funcMask[1] = 3; // PCSS
+			gInput.ShadowInfo = "PCSS";
+			gInput.setTitle = true;
 		}
 
 		// light
 		if (action == GLFW_PRESS && key == GLFW_KEY_6)
 		{
 			gInput.funcMask[2] = 0; // base color
+			gInput.LightInfo =  "BaseColor";
+			gInput.setTitle = true;
 		}
 		if (action == GLFW_PRESS && key == GLFW_KEY_7)
 		{
 			gInput.funcMask[2] = 1; // phong
+			gInput.LightInfo = "Phong";
+			gInput.setTitle = true;
 		}
 		if (action == GLFW_PRESS && key == GLFW_KEY_8)
 		{
 			gInput.funcMask[2] = 2; // blinnPhong
+			gInput.LightInfo = "BlinnPhong";
+			gInput.setTitle = true;
 		}
 		if (action == GLFW_PRESS && key == GLFW_KEY_9)
 		{
 			gInput.funcMask[2] = 3; // shadowMap
+			gInput.LightInfo = "ShadowMap";
+			gInput.setTitle = true;
 		}
 	}
 
 	void processInput()
 	{
+		if (gInput.setTitle)
+		{
+			std::string ntitle = getTitleInfo();
+			glfwSetWindowTitle(window, ntitle.c_str());
+			gInput.setTitle = false;
+		}
+		static float moveSpeed = 2.5f;
+		
+		static glm::vec3 right = { 1.0f, 0.0f, 0.0f };
+
+		glm::vec3 rotation{0.0f};
+		glm::vec3 camFront;
+		camFront.x = -cos(glm::radians(rotation.x)) * sin(glm::radians(rotation.y));
+		camFront.y = sin(glm::radians(rotation.x));
+		camFront.z = cos(glm::radians(rotation.x)) * cos(glm::radians(rotation.y));
+		camFront = glm::normalize(camFront);
+
+		glm::vec3 cameraDir = glm::normalize(gInput.target - gInput.cameraPos);
+		//static glm::vec3 right = glm::normalize(glm::cross(front, gInput.cameraUp));
 		// WASD
-		//if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-		//	camera.ProcessKeyboard(FORWARD, deltaTime);
-		//if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-		//	camera.ProcessKeyboard(BACKWARD, deltaTime);
-		//if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-		//	camera.ProcessKeyboard(LEFT, deltaTime);
-		//if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-		//	camera.ProcessKeyboard(RIGHT, deltaTime);
+
+		float moveStep = moveSpeed * deltaTime;
+		if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+		{
+			gInput.cameraPos -= gInput.target - cameraDir * moveStep;
+		}
+		if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+		{
+			gInput.cameraPos += gInput.target - cameraDir * moveStep;
+
+		}
+		if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+		{
+			//gInput.cameraPos -= right * moveSpeed * deltaTime;
+			gInput.cameraPos -= glm::normalize(glm::cross(camFront, glm::vec3(0.0f, 1.0f, 0.0f)))* moveStep;
+		}
+		if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+		{
+			gInput.cameraPos += glm::normalize(glm::cross(camFront, glm::vec3(0.0f, 1.0f, 0.0f))) * moveStep;
+		}
+
+		//gInput.target = 
 	}
 
 	void mainLoop()
