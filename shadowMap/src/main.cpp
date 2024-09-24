@@ -2573,12 +2573,12 @@ private:
 
 			for (size_t idx = 0; idx < baseScenePass.renderObjects.size(); idx++)
 			{
-				const auto& renderObject = baseScenePass.renderObjects[idx];
+				auto& renderObject = baseScenePass.renderObjects[idx];
 
 				//updateUniformBuffer(currentFrame, renderObject.modelMatrix, idx);
-				PushConstantData pcData = { renderObject.modelMatrix };
 				if (gInput.isModelRoll && idx == 1)
-					pcData.modelMatrix = pcData.modelMatrix * gInput.modelRoll;
+					renderObject.modelMatrix = renderObject.modelMatrix * gInput.modelRoll;
+				PushConstantData pcData = { renderObject.modelMatrix };
 				vkCmdPushConstants(commandBuffer, shadowPass.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstantData), &pcData);
 
 				// binding pipeline
@@ -2648,12 +2648,12 @@ private:
 
 			for (size_t idx = 0; idx < baseScenePass.renderObjects.size(); idx++)
 			{
-				const auto& renderObject = baseScenePass.renderObjects[idx];
+				auto& renderObject = baseScenePass.renderObjects[idx];
 
 				//updateUniformBuffer(currentFrame, renderObject.modelMatrix, idx);
-				PushConstantData pcData = { renderObject.modelMatrix };
 				if (gInput.isModelRoll && idx == 1)
-					pcData.modelMatrix = pcData.modelMatrix * gInput.modelRoll;
+					renderObject.modelMatrix = renderObject.modelMatrix * gInput.modelRoll;
+				PushConstantData pcData = { renderObject.modelMatrix };
 				vkCmdPushConstants(commandBuffer, baseScenePass.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstantData), &pcData);
 
 				// binding pipeline
@@ -2718,8 +2718,7 @@ private:
 
 		if (gInput.isModelRoll)
 		{
-			glm::mat4 rt = glm::rotate(glm::mat4(1.0), glm::radians(30.0f) * (float)deltaTime, glm::vec3(0.0f, 1.0f, 0.0f));
-			gInput.modelRoll *= rt;
+			gInput.modelRoll = glm::rotate(glm::mat4(1.0), glm::radians(30.0f) * (float)deltaTime, glm::vec3(0.0f, 1.0f, 0.0f));
 		}
 
 		// shadow
