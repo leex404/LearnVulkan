@@ -19,11 +19,6 @@ layout (binding  = 3) uniform UniformBufferObject {
 	ivec3 funcMask;
 };
 
-
-// bit mask
-// bias hardShadow PCF PCSS
-
-
 vec3 uLightColor = {1.0f, 1.0f, 1.0f};
 
 float zNear = 0.1f;

@@ -130,7 +130,7 @@ struct Vertex
 		attributeDescriptions[2].format = VK_FORMAT_R32G32B32_SFLOAT;
 		attributeDescriptions[2].offset = offsetof(Vertex, normal);
 
-		// texture cooordinate
+		// texture coordinate
 		attributeDescriptions[3].binding = 0;
 		attributeDescriptions[3].location = 3;
 		attributeDescriptions[3].format = VK_FORMAT_R32G32_SFLOAT;
@@ -148,7 +148,6 @@ struct Vertex
 struct Input
 {
 	glm::vec3 lightPos = { -5.0f, 5.0f, 3.0f };
-	//glm::vec3 lightPos = { 1.0f, 1.0f, 9.0f };
 	glm::vec3 cameraPos = { 0.0f, 2.0f, 10.0f };
 	glm::vec3 cameraUp = { 0.0f, 1.0f, 0.0f };
 	glm::vec3 target = { 0.0f, 0.0f, 0.0f };
@@ -535,8 +534,6 @@ private:
 		{
 			gInput.cameraPos += glm::normalize(glm::cross(camFront, glm::vec3(0.0f, 1.0f, 0.0f))) * moveStep;
 		}
-
-		//gInput.target = 
 	}
 
 	void mainLoop()
@@ -1040,57 +1037,57 @@ private:
 	{
 		// color attachment
 		VkAttachmentDescription colorAttachment {
-			.format = swapChainImageFormat,
-			.samples = VK_SAMPLE_COUNT_1_BIT,
+			.format         = swapChainImageFormat,
+			.samples        = VK_SAMPLE_COUNT_1_BIT,
 
-			.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-			.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+			.loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR,
+			.storeOp        = VK_ATTACHMENT_STORE_OP_STORE,
 
-			.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+			.stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 			.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
 
-			.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-			.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+			.initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED,
+			.finalLayout    = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
 		};
 
 
 		// attachment references
 		VkAttachmentReference colorAttachmentRef {
 			.attachment = 0,
-			.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+			.layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
 		};
 
 		// depth attachment
 		VkAttachmentDescription depthAttachment {
-			.format = findDepthFormat(),
-			.samples = VK_SAMPLE_COUNT_1_BIT,
-			.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-			.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-			.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+			.format         = findDepthFormat(),
+			.samples        = VK_SAMPLE_COUNT_1_BIT,
+			.loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR,
+			.storeOp        = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+			.stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 			.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-			.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-			.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+			.initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED,
+			.finalLayout    = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 		};
 
 		VkAttachmentReference depthAttachmentRef{
 			.attachment = 1,
-			.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+			.layout     = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
 		};
 
 		// subpass
 		VkSubpassDescription subpass {
-			.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
-			.colorAttachmentCount = 1,
-			.pColorAttachments = &colorAttachmentRef,
+			.pipelineBindPoint       = VK_PIPELINE_BIND_POINT_GRAPHICS,
+			.colorAttachmentCount    = 1,
+			.pColorAttachments       = &colorAttachmentRef,
 			.pDepthStencilAttachment = &depthAttachmentRef
 		};
 
 		// subpass dependencies
 		VkSubpassDependency dependency {
-			.srcSubpass = VK_SUBPASS_EXTERNAL,
-			.dstSubpass = 0,
-			.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-			.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+			.srcSubpass    = VK_SUBPASS_EXTERNAL,
+			.dstSubpass    = 0,
+			.srcStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+			.dstStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
 			.srcAccessMask = 0,
 			.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
 		};
@@ -1098,13 +1095,13 @@ private:
 		std::array<VkAttachmentDescription, 2> attachments = { colorAttachment, depthAttachment };
 
 		VkRenderPassCreateInfo renderPassInfo {
-			.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+			.sType           = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
 			.attachmentCount = static_cast<uint32_t>(attachments.size()),
-			.pAttachments = attachments.data(),
-			.subpassCount = 1,
-			.pSubpasses = &subpass,
+			.pAttachments    = attachments.data(),
+			.subpassCount    = 1,
+			.pSubpasses      = &subpass,
 			.dependencyCount = 1,
-			.pDependencies = &dependency,
+			.pDependencies   = &dependency,
 		};
 
 		if (vkCreateRenderPass(device, &renderPassInfo, nullptr, &renderPass) != VK_SUCCESS) {
@@ -1432,12 +1429,13 @@ private:
 
 	void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory)
 	{
-		VkBufferCreateInfo bufferInfo{};
-		bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-		bufferInfo.size = size;
+		VkBufferCreateInfo bufferInfo{
+		    .sType       = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+		    .size        = size,
 
-		bufferInfo.usage = usage;
-		bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		    .usage       = usage,
+		    .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+		};
 
 		if (vkCreateBuffer(device, &bufferInfo, nullptr, &buffer) != VK_SUCCESS)
 		{
@@ -1449,10 +1447,11 @@ private:
 		vkGetBufferMemoryRequirements(device, buffer, &memRequirements);
 
 		// allocation
-		VkMemoryAllocateInfo allocInfo{};
-		allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-		allocInfo.allocationSize = memRequirements.size;
-		allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
+		VkMemoryAllocateInfo allocInfo{
+		    .sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+		    .allocationSize  = memRequirements.size,
+		    .memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties),
+		};
 
 		if (vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS)
 		{
@@ -1868,6 +1867,64 @@ private:
 		}
 	}
 
+	std::vector<RenderObject> loadModels(const std::string& path)
+	{
+		tinyobj::attrib_t attrib;
+		std::vector<tinyobj::shape_t> shapes;
+		std::vector<tinyobj::material_t> materials;
+		std::string warn, err;
+
+		if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, path.c_str())) {
+			throw std::runtime_error(warn + err);
+		}
+
+		std::vector<RenderObject> models;
+
+		// each mesh shape
+		for (const auto& shape : shapes) 
+		{
+			RenderObject singleModel;
+			std::unordered_map<Vertex, uint32_t> uniqueVertices{};
+			for (const auto& index : shape.mesh.indices) 
+			{
+				Vertex vertex{};
+
+				vertex.pos = {
+					attrib.vertices[3 * index.vertex_index + 0],
+					attrib.vertices[3 * index.vertex_index + 1],
+					attrib.vertices[3 * index.vertex_index + 2]
+				};
+
+				vertex.texCoord = {
+					attrib.texcoords[2 * index.texcoord_index + 0],
+					1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
+				};
+
+				vertex.normal = {
+					attrib.normals[3 * index.normal_index + 0],
+					attrib.normals[3 * index.normal_index + 1],
+					attrib.normals[3 * index.normal_index + 2]
+				};
+
+				vertex.color = { 1.0f, 1.0f, 1.0f };
+
+				// Flip Y-Axis of vertex positions
+				//vertex.pos.y *= -1.0f;
+				//vertex.normal.y *= -1.0f;
+
+				if (uniqueVertices.count(vertex) == 0)
+				{
+					uniqueVertices[vertex] = static_cast<uint32_t>(singleModel.vertices.size());
+					singleModel.vertices.push_back(vertex);
+				}
+				singleModel.indices.push_back(uniqueVertices[vertex]);
+			}
+
+			models.push_back(singleModel);
+		}
+		return models;
+	}
+
 	void createVertexBuffer(const std::vector<Vertex>& vertices, VkBuffer & vBuffer, VkDeviceMemory& vBufferMemory)
 	{
 		// create buffer
@@ -2022,13 +2079,13 @@ private:
 				.offset = 0,
 				.range  = sizeof(UniformBufferObject),
 			};
-			descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			descriptorWrites[0].dstSet = descriptorSets[i];
-			descriptorWrites[0].dstBinding = 0;
+			descriptorWrites[0].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			descriptorWrites[0].dstSet          = descriptorSets[i];
+			descriptorWrites[0].dstBinding      = 0;
 			descriptorWrites[0].dstArrayElement = 0;
-			descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			descriptorWrites[0].descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 			descriptorWrites[0].descriptorCount = 1;
-			descriptorWrites[0].pBufferInfo = &bufferInfo;
+			descriptorWrites[0].pBufferInfo     = &bufferInfo;
 
 			// texture sampler
 			std::vector<VkDescriptorImageInfo> imageInfos; // descriptorWrites 会引用每一个创建的 VkDescriptorImageInfo，所以需要用一个数组把它们存储起来
@@ -2055,8 +2112,8 @@ private:
 
 			// shadowMap sampler
 			VkDescriptorImageInfo shadowImageInfo{
-				.sampler = shadowPass.shadowMapSampler,
-				.imageView = shadowPass.shadowMapImageView,
+				.sampler     = shadowPass.shadowMapSampler,
+				.imageView   = shadowPass.shadowMapImageView,
 				.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
 			};
 
@@ -2072,15 +2129,15 @@ private:
 			VkDescriptorBufferInfo viewBufferInfo{
 				.buffer = m_viewUniformBuffers[i],
 				.offset = 0,
-				.range = sizeof(ViewUniformBufferObject),
+				.range  = sizeof(ViewUniformBufferObject),
 			};
-			descriptorWrites[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			descriptorWrites[3].dstSet = descriptorSets[i];
-			descriptorWrites[3].dstBinding = 3;
+			descriptorWrites[3].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			descriptorWrites[3].dstSet          = descriptorSets[i];
+			descriptorWrites[3].dstBinding      = 3;
 			descriptorWrites[3].dstArrayElement = 0;
-			descriptorWrites[3].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			descriptorWrites[3].descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 			descriptorWrites[3].descriptorCount = 1;
-			descriptorWrites[3].pBufferInfo = &viewBufferInfo;
+			descriptorWrites[3].pBufferInfo     = &viewBufferInfo;
 
 			vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
 		}
@@ -2508,38 +2565,38 @@ private:
 		auto createObjectResource = [this](RenderObject& model, const std::string& modelPath, const std::vector<std::string>& texImages) {
 			// model 
 			loadModel(modelPath, model);
-			model.textureImages.resize(texImages.size());
-			model.textureImageViews.resize(texImages.size());
-			model.textureImageMemorys.resize(texImages.size());
-			model.textureSamplers.resize(texImages.size());
+				model.textureImages.resize(texImages.size());
+				model.textureImageViews.resize(texImages.size());
+				model.textureImageMemorys.resize(texImages.size());
+				model.textureSamplers.resize(texImages.size());
 
-			//texture
-			for (size_t idx = 0; idx < texImages.size(); idx++)
-			{
-				// create texture image
-				createTextureImage(texImages[idx], model.textureImages[idx], model.textureImageMemorys[idx]);
+				//texture
+				for (size_t idx = 0; idx < texImages.size(); idx++)
+				{
+					// create texture image
+					createTextureImage(texImages[idx], model.textureImages[idx], model.textureImageMemorys[idx]);
 
-				// create image view
-				model.textureImageViews[idx] = createTextureImageView(model.textureImages[idx]);
+					// create image view
+					model.textureImageViews[idx] = createTextureImageView(model.textureImages[idx]);
 
-				// create sampler
-				model.textureSamplers[idx] = createTextureSampler(
-					VK_FILTER_LINEAR,
-					VK_SAMPLER_ADDRESS_MODE_REPEAT,
-					VK_SAMPLER_ADDRESS_MODE_REPEAT,
-					VK_SAMPLER_ADDRESS_MODE_REPEAT,
-					VK_BORDER_COLOR_INT_OPAQUE_BLACK,
-					0
-				);
+					// create sampler
+					model.textureSamplers[idx] = createTextureSampler(
+						VK_FILTER_LINEAR,
+						VK_SAMPLER_ADDRESS_MODE_REPEAT,
+						VK_SAMPLER_ADDRESS_MODE_REPEAT,
+						VK_SAMPLER_ADDRESS_MODE_REPEAT,
+						VK_BORDER_COLOR_INT_OPAQUE_BLACK,
+						0
+					);
 			};
 
-			// buffer
-			createVertexBuffer(model.vertices, model.vertexBuffer, model.vertexBufferMemory);
-			createIndexBuffer(model.indices, model.indexBuffer, model.indexBufferMemory);
+				// buffer
+				createVertexBuffer(model.vertices, model.vertexBuffer, model.vertexBufferMemory);
+				createIndexBuffer(model.indices, model.indexBuffer, model.indexBufferMemory);
 
-			createDescriptorPool(model.descriptorPool, static_cast<uint32_t>(texImages.size() + 1));
-			createDescriptorSets(model.descriptorPool, baseScenePass.descriptorSetLayout, model.textureImageViews, model.textureSamplers, model.descriptorSets);
-		};
+				createDescriptorPool(model.descriptorPool, static_cast<uint32_t>(texImages.size() + 1));
+				createDescriptorSets(model.descriptorPool, baseScenePass.descriptorSetLayout, model.textureImageViews, model.textureSamplers, model.descriptorSets);
+			};
 
 		// models in scene and resource
 		RenderObject stage;
@@ -2639,7 +2696,7 @@ private:
 				auto& renderObject = baseScenePass.renderObjects[idx];
 
 				//updateUniformBuffer(currentFrame, renderObject.modelMatrix, idx);
-				if (gInput.isModelRoll && idx == 1)
+				if (gInput.isModelRoll && idx != 0)
 					renderObject.modelMatrix = renderObject.modelMatrix * gInput.modelRoll;
 				PushConstantData pcData = { renderObject.modelMatrix };
 				vkCmdPushConstants(commandBuffer, shadowPass.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstantData), &pcData);
@@ -2714,7 +2771,7 @@ private:
 				auto& renderObject = baseScenePass.renderObjects[idx];
 
 				//updateUniformBuffer(currentFrame, renderObject.modelMatrix, idx);
-				if (gInput.isModelRoll && idx == 1)
+				if (gInput.isModelRoll && idx != 0)
 					renderObject.modelMatrix = renderObject.modelMatrix * gInput.modelRoll;
 				PushConstantData pcData = { renderObject.modelMatrix };
 				vkCmdPushConstants(commandBuffer, baseScenePass.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstantData), &pcData);
